@@ -1,5 +1,7 @@
 mod format_json;
 mod format_token;
+#[macro_use]
+mod format_tokens_macro;
 mod intersperse;
 mod printer;
 

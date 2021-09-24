@@ -1,5 +1,5 @@
 use crate::format_token::{GroupToken, IfBreakToken, LineToken};
-use crate::{format_token::FormatToken, FormatValue};
+use crate::{format_tokens, FormatToken, FormatValue, IndentToken, ListToken};
 use serde_json::Value;
 
 impl FormatValue for Value {
@@ -12,33 +12,31 @@ impl FormatValue for Value {
 			}
 			Value::Bool(value) => FormatToken::from(value),
 			Value::Object(value) => {
-				let separator = FormatToken::concat(vec![
-					FormatToken::string(","),
-					FormatToken::Line(LineToken::soft_or_space()),
-				]);
-
 				let properties_list: Vec<FormatToken> = value
 					.iter()
 					.map(|(key, value)| {
-						FormatToken::concat(vec![
-							FormatToken::string(format!("\"{}\":", key).as_str()),
+						FormatToken::from(format_tokens![
+							format!("\"{}\":", key).as_str(),
 							FormatToken::Space,
 							value.format(),
 						])
 					})
 					.collect();
 
-				let properties = vec![
-					FormatToken::Line(LineToken::soft()),
-					FormatToken::join(separator, properties_list),
-					FormatToken::IfBreak(IfBreakToken::new(FormatToken::string(","))),
+				let properties = format_tokens![
+					LineToken::soft(),
+					ListToken::join(
+						format_tokens![",", LineToken::soft_or_space(),],
+						properties_list
+					),
+					IfBreakToken::new(","),
 				];
 
-				FormatToken::Group(GroupToken::new(vec![
-					FormatToken::string("{"),
-					FormatToken::indent(properties),
-					FormatToken::Line(LineToken::soft()),
-					FormatToken::string("}"),
+				FormatToken::from(GroupToken::new(format_tokens![
+					"{",
+					IndentToken::new(properties),
+					LineToken::soft(),
+					"}",
 				]))
 			}
 			Value::Null => FormatToken::string("null"),
@@ -55,7 +53,7 @@ pub fn json_to_tokens(content: &str) -> FormatToken {
 
 #[cfg(test)]
 mod test {
-	use crate::FormatToken;
+	use crate::{format_tokens, FormatToken, IndentToken};
 
 	use super::json_to_tokens;
 	use crate::format_token::{GroupToken, IfBreakToken, LineToken};
@@ -98,22 +96,22 @@ mod test {
 	#[test]
 	fn tokenize_object() {
 		let input = r#"{ "foo": "bar", "num": 5 }"#;
-		let expected = FormatToken::Group(GroupToken::new(vec![
-			FormatToken::string("{"),
-			FormatToken::indent(FormatToken::concat(vec![
-				FormatToken::Line(LineToken::soft()),
-				FormatToken::string("\"foo\":"),
+		let expected = FormatToken::Group(GroupToken::new(format_tokens![
+			"{",
+			IndentToken::new(FormatToken::concat(format_tokens![
+				LineToken::soft(),
+				"\"foo\":",
 				FormatToken::Space,
-				FormatToken::string("\"bar\""),
-				FormatToken::string(","),
-				FormatToken::Line(LineToken::soft_or_space()),
-				FormatToken::string("\"num\":"),
+				"\"bar\"",
+				",",
+				LineToken::soft_or_space(),
+				"\"num\":",
 				FormatToken::Space,
-				FormatToken::string("5"),
-				FormatToken::IfBreak(IfBreakToken::new(FormatToken::string(","))),
+				"5",
+				IfBreakToken::new(FormatToken::string(",")),
 			])),
-			FormatToken::Line(LineToken::soft()),
-			FormatToken::string("}"),
+			LineToken::soft(),
+			"}",
 		]));
 
 		let result = json_to_tokens(input);
